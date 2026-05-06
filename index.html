@@ -256,6 +256,89 @@
       color: #c0392b;
     }
 
+    .history-card {
+      margin-top: 20px;
+      padding: 20px;
+    }
+
+    .history-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .history-head strong {
+      font-size: 17px;
+    }
+
+    .history-head button {
+      border: 0;
+      background: transparent;
+      color: var(--accent);
+      font-size: 14px;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .history-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .history-item {
+      width: 100%;
+      padding: 14px 16px;
+      border: 1px solid rgba(151, 170, 208, 0.18);
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(248, 250, 255, 0.96), rgba(242, 246, 255, 0.84));
+      text-align: left;
+      cursor: pointer;
+      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .history-item:hover {
+      transform: translateY(-1px);
+      border-color: rgba(36, 87, 245, 0.22);
+      box-shadow: 0 12px 24px rgba(42, 63, 102, 0.08);
+    }
+
+    .history-item-code,
+    .history-item-name,
+    .history-item-meta {
+      display: block;
+    }
+
+    .history-item-code {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .history-item-name {
+      margin-top: 8px;
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--text-main);
+    }
+
+    .history-item-meta {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+
+    .history-empty {
+      padding: 18px;
+      border-radius: 18px;
+      background: rgba(242, 246, 255, 0.72);
+      color: var(--text-sub);
+      font-size: 14px;
+      text-align: center;
+    }
+
     .rise {
       background: linear-gradient(135deg, #ff6a4d, #dc3e3e);
     }
@@ -304,6 +387,10 @@
         display: grid;
       }
 
+      .history-list {
+        grid-template-columns: 1fr;
+      }
+
       .change-pill {
         min-width: auto;
         text-align: left;
@@ -346,6 +433,14 @@
 
         <div id="status" class="status">页面已就绪，点击“立即查询”获取估值。</div>
       </div>
+    </section>
+
+    <section class="panel history-card">
+      <div class="history-head">
+        <strong>最近查看</strong>
+        <button id="clear-history-btn" type="button">清空记录</button>
+      </div>
+      <div id="history-list" class="history-list"></div>
     </section>
 
     <section class="panel quote-card">
@@ -391,6 +486,8 @@
       var form = document.getElementById("fund-form");
       var fundCodeInput = document.getElementById("fund-code");
       var queryBtn = document.getElementById("query-btn");
+      var historyListEl = document.getElementById("history-list");
+      var clearHistoryBtn = document.getElementById("clear-history-btn");
       var statusEl = document.getElementById("status");
       var codeLabelEl = document.getElementById("fund-code-label");
       var nameEl = document.getElementById("fund-name");
@@ -400,6 +497,64 @@
       var jzrqEl = document.getElementById("fund-jzrq");
       var gztimeEl = document.getElementById("fund-gztime");
       var changePillEl = document.getElementById("change-pill");
+      var storageKey = "fund_recent_history_v1";
+      var historyLimit = 10;
+
+      function readHistory() {
+        try {
+          var raw = window.localStorage.getItem(storageKey);
+          var parsed = raw ? JSON.parse(raw) : [];
+          return Array.isArray(parsed) ? parsed : [];
+        } catch (error) {
+          return [];
+        }
+      }
+
+      function writeHistory(history) {
+        try {
+          window.localStorage.setItem(storageKey, JSON.stringify(history));
+        } catch (error) {
+          // 忽略本地存储异常，避免影响主流程
+        }
+      }
+
+      function renderHistory() {
+        var history = readHistory();
+
+        if (!history.length) {
+          historyListEl.innerHTML = '<div class="history-empty">暂无最近查看记录，查询基金后会自动展示最近 10 条。</div>';
+          return;
+        }
+
+        historyListEl.innerHTML = history.map(function (item) {
+          var rateText = formatRate(item.gszzl);
+          var viewedAt = item.viewedAt || "";
+          return ''
+            + '<button class="history-item" type="button" data-code="' + item.fundcode + '">'
+            + '<span class="history-item-code">基金代码 ' + item.fundcode + '</span>'
+            + '<span class="history-item-name">' + (item.name || "暂无基金名称") + '</span>'
+            + '<span class="history-item-meta">最新估值 ' + (item.gsz || "--") + ' / 涨跌幅 ' + rateText + '</span>'
+            + '<span class="history-item-meta">查看时间 ' + viewedAt + '</span>'
+            + '</button>';
+        }).join("");
+      }
+
+      function saveHistory(data) {
+        var history = readHistory().filter(function (item) {
+          return item.fundcode !== data.fundcode;
+        });
+
+        history.unshift({
+          fundcode: data.fundcode,
+          name: data.name || "",
+          gsz: data.gsz || "",
+          gszzl: data.gszzl || "",
+          viewedAt: data.gztime || new Date().toLocaleString()
+        });
+
+        writeHistory(history.slice(0, historyLimit));
+        renderHistory();
+      }
 
       function setLoading(isLoading, text) {
         queryBtn.disabled = isLoading;
@@ -511,6 +666,7 @@
             throw new Error("未获取到有效基金数据");
           }
           renderFund(data);
+          saveHistory(data);
           setLoading(false, "查询成功，数据已更新。");
         } catch (error) {
           setLoading(false, "");
@@ -523,6 +679,24 @@
         handleQuery(fundCodeInput.value.trim());
       });
 
+      historyListEl.addEventListener("click", function (event) {
+        var target = event.target.closest("[data-code]");
+        if (!target) {
+          return;
+        }
+        var code = target.getAttribute("data-code") || "";
+        fundCodeInput.value = code;
+        handleQuery(code);
+      });
+
+      clearHistoryBtn.addEventListener("click", function () {
+        writeHistory([]);
+        renderHistory();
+        statusEl.className = "status";
+        statusEl.textContent = "最近查看记录已清空。";
+      });
+
+      renderHistory();
       handleQuery(fundCodeInput.value.trim());
     })();
   </script>
