@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>分组明细</title>
+  <link rel="stylesheet" href="./assets/app.css">
+</head>
+<body>
+  <main class="page">
+    <section class="panel detail-hero">
+      <div class="detail-head">
+        <div>
+          <a class="back-link" href="./index.html">返回主页面</a>
+          <p class="eyebrow">Group Detail</p>
+          <h1 id="group-title">分组明细</h1>
+          <p id="group-summary" class="detail-copy">进入页面后会按顺序逐笔加载组内基金估值，避免一次性并发请求过高。</p>
+        </div>
+        <div class="detail-actions">
+          <button id="refresh-group-btn" type="button">刷新整组</button>
+          <button id="delete-group-btn" class="ghost-btn" type="button">删除分组</button>
+        </div>
+      </div>
+
+      <form id="fund-add-form" class="search-box compact">
+        <input id="group-fund-code" name="group-fund-code" type="text" inputmode="numeric" maxlength="6" placeholder="输入 6 位基金代码添加到当前分组">
+        <button type="submit">新增基金</button>
+      </form>
+
+      <div id="detail-status" class="status">准备加载分组数据...</div>
+    </section>
+
+    <section class="panel groups-panel">
+      <div class="section-head">
+        <div>
+          <strong>分组基金列表</strong>
+          <span>单组最多 10 只基金，支持本地新增与删除</span>
+        </div>
+        <div id="group-count-badge" class="badge">0/10</div>
+      </div>
+      <div id="group-fund-list" class="stack-list"></div>
+    </section>
+  </main>
+
+  <script src="./assets/fund-common.js"></script>
+  <script>
+    (function () {
+      var api = window.FundApp;
+      var params = new URLSearchParams(window.location.search);
+      var groupId = params.get("groupId") || "";
+      var titleEl = document.getElementById("group-title");
+      var summaryEl = document.getElementById("group-summary");
+      var statusEl = document.getElementById("detail-status");
+      var countBadgeEl = document.getElementById("group-count-badge");
+      var fundListEl = document.getElementById("group-fund-list");
+      var refreshBtn = document.getElementById("refresh-group-btn");
+      var deleteGroupBtn = document.getElementById("delete-group-btn");
+      var addForm = document.getElementById("fund-add-form");
+      var addInput = document.getElementById("group-fund-code");
+      var isLoading = false;
+
+      function currentGroup() {
+        return api.getGroupById(groupId);
+      }
+
+      function setStatus(message, isError) {
+        statusEl.className = isError ? "status error" : "status";
+        statusEl.textContent = message || "";
+      }
+
+      function renderHeader(group) {
+        titleEl.textContent = group.name + " 分组明细";
+        summaryEl.textContent = "当前分组共 " + group.funds.length + " 只基金。页面会按顺序逐笔请求实时估值，每笔之间自动延迟，降低瞬时请求压力。";
+        countBadgeEl.textContent = group.funds.length + "/10";
+      }
+
+      function renderEmpty(group) {
+        renderHeader(group);
+        fundListEl.innerHTML = '<div class="history-empty">当前分组还没有基金代码，先新增一只基金开始跟踪。</div>';
+      }
+
+      function renderSkeleton(group) {
+        renderHeader(group);
+        fundListEl.innerHTML = group.funds.map(function (code) {
+          return ''
+            + '<article class="fund-row loading" data-fund-row="' + code + '">'
+            + '<div class="fund-row-main">'
+            + '<small>基金代码 ' + code + '</small>'
+            + '<h3>正在加载基金信息...</h3>'
+            + '<p>等待顺序请求中</p>'
+            + '</div>'
+            + '<div class="fund-row-side">'
+            + '<strong>--</strong>'
+            + '<span>实时涨跌幅</span>'
+            + '<button class="ghost-btn small" type="button" data-remove-code="' + code + '">删除</button>'
+            + '</div>'
+            + '</article>';
+        }).join("");
+      }
+
+      function renderFundRow(data) {
+        var row = fundListEl.querySelector('[data-fund-row="' + data.fundcode + '"]');
+        if (!row) {
+          return;
+        }
+        row.className = "fund-row";
+        row.innerHTML = ''
+          + '<div class="fund-row-main">'
+          + '<small>基金代码 ' + data.fundcode + '</small>'
+          + '<h3>' + (data.name || "暂无基金名称") + '</h3>'
+          + '<p>实时净值 ' + (data.gsz || "--") + ' / 昨日净值 ' + (data.dwjz || "--") + '</p>'
+          + '<p>净值日期 ' + (data.jzrq || "--") + ' / 估值时间 ' + (data.gztime || "--") + '</p>'
+          + '</div>'
+          + '<div class="fund-row-side">'
+          + '<strong class="' + api.getTrendTextClass(data.gszzl) + '">' + api.formatRate(data.gszzl) + '</strong>'
+          + '<span>实时涨跌幅</span>'
+          + '<button class="ghost-btn small" type="button" data-remove-code="' + data.fundcode + '">删除</button>'
+          + '</div>';
+      }
+
+      function renderFundError(code, message) {
+        var row = fundListEl.querySelector('[data-fund-row="' + code + '"]');
+        if (!row) {
+          return;
+        }
+        row.className = "fund-row";
+        row.innerHTML = ''
+          + '<div class="fund-row-main">'
+          + '<small>基金代码 ' + code + '</small>'
+          + '<h3>加载失败</h3>'
+          + '<p>' + message + '</p>'
+          + '</div>'
+          + '<div class="fund-row-side">'
+          + '<strong class="neutral-text">--</strong>'
+          + '<span>实时涨跌幅</span>'
+          + '<button class="ghost-btn small" type="button" data-remove-code="' + code + '">删除</button>'
+          + '</div>';
+      }
+
+      async function loadGroupFunds() {
+        var group = currentGroup();
+        if (!group) {
+          setStatus("分组不存在或已被删除，即将返回主页面。", true);
+          window.setTimeout(function () {
+            window.location.href = "./index.html";
+          }, 1200);
+          return;
+        }
+
+        if (!group.funds.length) {
+          renderEmpty(group);
+          setStatus("当前分组暂无基金代码。", false);
+          return;
+        }
+
+        isLoading = true;
+        refreshBtn.disabled = true;
+        renderSkeleton(group);
+        setStatus("正在顺序加载组内基金数据...", false);
+
+        for (var index = 0; index < group.funds.length; index += 1) {
+          var code = group.funds[index];
+          try {
+            var data = await api.fetchFundInfo(code);
+            if (!data || !data.fundcode) {
+              throw new Error("未获取到有效基金数据");
+            }
+            renderFundRow(data);
+            api.saveRecentFund(data);
+          } catch (error) {
+            renderFundError(code, error.message || "加载失败");
+          }
+
+          if (index < group.funds.length - 1) {
+            await api.delay(700);
+          }
+        }
+
+        isLoading = false;
+        refreshBtn.disabled = false;
+        setStatus("整组基金数据已加载完成。", false);
+      }
+
+      function init() {
+        var group = currentGroup();
+        if (!group) {
+          setStatus("未找到分组信息。", true);
+          return;
+        }
+        renderHeader(group);
+        if (!group.funds.length) {
+          renderEmpty(group);
+        }
+        loadGroupFunds();
+      }
+
+      refreshBtn.addEventListener("click", function () {
+        if (isLoading) {
+          return;
+        }
+        loadGroupFunds();
+      });
+
+      deleteGroupBtn.addEventListener("click", function () {
+        api.deleteGroup(groupId);
+        window.location.href = "./index.html";
+      });
+
+      addForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        if (isLoading) {
+          setStatus("当前正在加载整组数据，请稍后再新增基金。", true);
+          return;
+        }
+        var result = api.addFundToGroup(groupId, addInput.value);
+        if (!result.ok) {
+          setStatus(result.message, true);
+          return;
+        }
+        addInput.value = "";
+        setStatus("基金代码已加入分组，开始刷新整组数据。", false);
+        loadGroupFunds();
+      });
+
+      fundListEl.addEventListener("click", function (event) {
+        var removeButton = event.target.closest("[data-remove-code]");
+        if (!removeButton) {
+          return;
+        }
+        if (isLoading) {
+          setStatus("当前正在加载整组数据，请稍后再删除基金。", true);
+          return;
+        }
+        var code = removeButton.getAttribute("data-remove-code");
+        api.removeFundFromGroup(groupId, code);
+        var group = currentGroup();
+        if (!group || !group.funds.length) {
+          renderEmpty(group || { name: "分组", funds: [] });
+          setStatus("基金代码已删除。", false);
+          return;
+        }
+        setStatus("基金代码已删除，正在刷新分组列表。", false);
+        loadGroupFunds();
+      });
+
+      init();
+    })();
+  </script>
+</body>
+</html>

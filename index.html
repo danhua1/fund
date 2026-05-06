@@ -1,444 +1,68 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>基金实时估值</title>
-  <style>
-    :root {
-      --bg-start: #f5f7fb;
-      --bg-end: #eef3ff;
-      --card-bg: rgba(255, 255, 255, 0.94);
-      --text-main: #162033;
-      --text-sub: #667189;
-      --border: rgba(130, 150, 190, 0.18);
-      --shadow: 0 24px 64px rgba(42, 63, 102, 0.14);
-      --rise: #dc3e3e;
-      --fall: #0f9d7a;
-      --neutral: #40608f;
-      --accent: #2457f5;
-      --accent-soft: rgba(36, 87, 245, 0.1);
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-      color: var(--text-main);
-      background:
-        radial-gradient(circle at top left, rgba(36, 87, 245, 0.12), transparent 32%),
-        radial-gradient(circle at bottom right, rgba(15, 157, 122, 0.12), transparent 28%),
-        linear-gradient(160deg, var(--bg-start), var(--bg-end));
-    }
-
-    .page {
-      width: min(100%, 1120px);
-      margin: 0 auto;
-      padding: 32px 20px 48px;
-    }
-
-    .hero {
-      display: grid;
-      gap: 24px;
-      align-items: center;
-      grid-template-columns: 1.05fr 0.95fr;
-    }
-
-    .hero-copy h1 {
-      margin: 0 0 14px;
-      font-size: clamp(30px, 5vw, 52px);
-      line-height: 1.08;
-      letter-spacing: -0.04em;
-    }
-
-    .hero-copy p {
-      margin: 0;
-      max-width: 560px;
-      font-size: 16px;
-      line-height: 1.8;
-      color: var(--text-sub);
-    }
-
-    .panel {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 28px;
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(18px);
-    }
-
-    .search-panel {
-      padding: 24px;
-    }
-
-    .search-header {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 20px;
-      align-items: center;
-    }
-
-    .search-header strong {
-      display: block;
-      font-size: 19px;
-    }
-
-    .search-header span {
-      color: var(--text-sub);
-      font-size: 13px;
-    }
-
-    .badge {
-      padding: 8px 12px;
-      border-radius: 999px;
-      background: var(--accent-soft);
-      color: var(--accent);
-      font-size: 12px;
-      font-weight: 600;
-      white-space: nowrap;
-    }
-
-    .search-box {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 12px;
-    }
-
-    .search-box input {
-      width: 100%;
-      height: 52px;
-      padding: 0 16px;
-      border-radius: 16px;
-      border: 1px solid var(--border);
-      background: #fff;
-      font-size: 16px;
-      color: var(--text-main);
-      outline: none;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .search-box input:focus {
-      border-color: rgba(36, 87, 245, 0.5);
-      box-shadow: 0 0 0 4px rgba(36, 87, 245, 0.08);
-    }
-
-    .search-box button {
-      height: 52px;
-      padding: 0 22px;
-      border: 0;
-      border-radius: 16px;
-      background: linear-gradient(135deg, #2457f5, #2c77ff);
-      color: #fff;
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
-      box-shadow: 0 12px 24px rgba(36, 87, 245, 0.24);
-    }
-
-    .search-box button:hover {
-      transform: translateY(-1px);
-    }
-
-    .search-box button:disabled {
-      opacity: 0.7;
-      cursor: wait;
-      transform: none;
-    }
-
-    .hint-row {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      margin-top: 12px;
-      font-size: 13px;
-      color: var(--text-sub);
-      flex-wrap: wrap;
-    }
-
-    .quote-card {
-      margin-top: 28px;
-      padding: 28px;
-    }
-
-    .quote-top {
-      display: flex;
-      justify-content: space-between;
-      gap: 16px;
-      align-items: flex-start;
-      margin-bottom: 24px;
-    }
-
-    .fund-meta small {
-      display: inline-block;
-      padding: 6px 10px;
-      border-radius: 999px;
-      background: #f2f6ff;
-      color: var(--accent);
-      font-weight: 600;
-      letter-spacing: 0.04em;
-    }
-
-    .fund-meta h2 {
-      margin: 14px 0 0;
-      font-size: clamp(22px, 4vw, 30px);
-      line-height: 1.35;
-    }
-
-    .change-pill {
-      min-width: 132px;
-      padding: 14px 16px;
-      border-radius: 22px;
-      text-align: right;
-      color: #fff;
-      background: var(--neutral);
-    }
-
-    .change-pill strong {
-      display: block;
-      font-size: 30px;
-      line-height: 1;
-    }
-
-    .change-pill span {
-      display: block;
-      margin-top: 8px;
-      font-size: 13px;
-      opacity: 0.9;
-    }
-
-    .metrics {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 14px;
-    }
-
-    .metric {
-      padding: 18px;
-      border-radius: 20px;
-      background: linear-gradient(180deg, rgba(248, 250, 255, 0.96), rgba(242, 246, 255, 0.82));
-      border: 1px solid rgba(151, 170, 208, 0.15);
-    }
-
-    .metric span {
-      display: block;
-      margin-bottom: 10px;
-      font-size: 13px;
-      color: var(--text-sub);
-    }
-
-    .metric strong {
-      font-size: clamp(22px, 3vw, 28px);
-      line-height: 1.1;
-    }
-
-    .footer-note {
-      margin-top: 18px;
-      font-size: 13px;
-      color: var(--text-sub);
-      line-height: 1.7;
-    }
-
-    .status {
-      min-height: 22px;
-      margin-top: 14px;
-      font-size: 14px;
-      color: var(--text-sub);
-    }
-
-    .status.error {
-      color: #c0392b;
-    }
-
-    .history-card {
-      margin-top: 20px;
-      padding: 20px;
-    }
-
-    .history-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-
-    .history-head strong {
-      font-size: 17px;
-    }
-
-    .history-head button {
-      border: 0;
-      background: transparent;
-      color: var(--accent);
-      font-size: 14px;
-      cursor: pointer;
-      padding: 0;
-    }
-
-    .history-list {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
-    }
-
-    .history-item {
-      width: 100%;
-      padding: 14px 16px;
-      border: 1px solid rgba(151, 170, 208, 0.18);
-      border-radius: 18px;
-      background: linear-gradient(180deg, rgba(248, 250, 255, 0.96), rgba(242, 246, 255, 0.84));
-      text-align: left;
-      cursor: pointer;
-      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .history-item:hover {
-      transform: translateY(-1px);
-      border-color: rgba(36, 87, 245, 0.22);
-      box-shadow: 0 12px 24px rgba(42, 63, 102, 0.08);
-    }
-
-    .history-item-code,
-    .history-item-name,
-    .history-item-meta {
-      display: block;
-    }
-
-    .history-item-code {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--accent);
-    }
-
-    .history-item-name {
-      margin-top: 8px;
-      font-size: 14px;
-      line-height: 1.5;
-      color: var(--text-main);
-    }
-
-    .history-item-meta {
-      margin-top: 10px;
-      font-size: 12px;
-      color: var(--text-sub);
-    }
-
-    .history-empty {
-      padding: 18px;
-      border-radius: 18px;
-      background: rgba(242, 246, 255, 0.72);
-      color: var(--text-sub);
-      font-size: 14px;
-      text-align: center;
-    }
-
-    .rise {
-      background: linear-gradient(135deg, #ff6a4d, #dc3e3e);
-    }
-
-    .fall {
-      background: linear-gradient(135deg, #12b886, #0f9d7a);
-    }
-
-    .neutral {
-      background: linear-gradient(135deg, #4e6f9f, #40608f);
-    }
-
-    @media (max-width: 860px) {
-      .page {
-        padding: 22px 16px 36px;
-      }
-
-      .hero {
-        grid-template-columns: 1fr;
-      }
-
-      .search-panel,
-      .quote-card {
-        border-radius: 24px;
-      }
-    }
-
-    @media (max-width: 560px) {
-
-      .search-panel,
-      .quote-card {
-        padding: 18px;
-      }
-
-      .search-box {
-        grid-template-columns: 1fr;
-      }
-
-      .search-box button {
-        width: 100%;
-      }
-
-      .quote-top,
-      .metrics {
-        grid-template-columns: 1fr;
-        display: grid;
-      }
-
-      .history-list {
-        grid-template-columns: 1fr;
-      }
-
-      .change-pill {
-        min-width: auto;
-        text-align: left;
-      }
-
-      .hint-row {
-        font-size: 12px;
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="./assets/app.css">
 </head>
-
 <body>
   <main class="page">
     <section class="hero">
       <div class="hero-copy">
-        <h1>基金实时估值，一页直达</h1>
-        <p>输入基金代码，即可查看名称、前一日净值、实时估值和实时涨跌幅。</p>
+        <p class="eyebrow">Fund Board</p>
+        <h1>基金估值查询与分组看板</h1>
+        <p>主页面负责单基金查询和分组入口管理，分组页负责一次性查看整组基金的实时估值数据，全部数据都只保存在本地浏览器。</p>
       </div>
 
-      <div class="panel search-panel">
-        <div class="search-header">
+      <section class="panel search-panel">
+        <div class="section-head">
           <div>
-            <strong>实时估值查询</strong>
-            <!-- <span>支持东方财富 JSONP 接口格式</span> -->
+            <strong>单基金实时查询</strong>
+            <span>适合快速查单只基金</span>
           </div>
-          <div class="badge">原生响应式</div>
+          <div class="badge">原生 H5 + CSS3</div>
         </div>
 
         <form id="fund-form" class="search-box">
-          <input id="fund-code" name="fund-code" type="text" inputmode="numeric" maxlength="6" placeholder="请输入 6 位基金代码"
-            value="017470" autocomplete="off">
+          <input id="fund-code" name="fund-code" type="text" inputmode="numeric" maxlength="6" placeholder="请输入 6 位基金代码" value="017470" autocomplete="off">
           <button id="query-btn" type="submit">立即查询</button>
         </form>
 
         <div class="hint-row">
           <span>示例代码：017470</span>
-          <!-- <span>移动端与桌面端自适应布局</span> -->
+          <span>支持桌面端与 H5 自适应布局</span>
         </div>
 
         <div id="status" class="status">页面已就绪，点击“立即查询”获取估值。</div>
+      </section>
+    </section>
+
+    <section class="panel groups-panel">
+      <div class="section-head">
+        <div>
+          <strong>基金分组</strong>
+          <span>创建分组后可进入明细页查看整组数据</span>
+        </div>
+        <div class="badge">单组最多 10 只</div>
       </div>
+
+      <form id="group-form" class="search-box compact">
+        <input id="group-name" name="group-name" type="text" maxlength="20" placeholder="输入分组名称，例如：半导体观察">
+        <button type="submit">创建分组</button>
+      </form>
+
+      <div id="group-status" class="status"></div>
+      <div id="group-list" class="group-grid"></div>
     </section>
 
     <section class="panel history-card">
-      <div class="history-head">
-        <strong>最近查看</strong>
-        <button id="clear-history-btn" type="button">清空记录</button>
+      <div class="section-head">
+        <div>
+          <strong>最近查看</strong>
+          <span>保留最近 10 条成功查询记录</span>
+        </div>
+        <button id="clear-history-btn" class="ghost-btn" type="button">清空记录</button>
       </div>
       <div id="history-list" class="history-list"></div>
     </section>
@@ -480,14 +104,13 @@
     </section>
   </main>
 
+  <script src="./assets/fund-common.js"></script>
   <script>
     (function () {
-      var apiBase = "https://fundgz.1234567.com.cn/js/";
+      var api = window.FundApp;
       var form = document.getElementById("fund-form");
       var fundCodeInput = document.getElementById("fund-code");
       var queryBtn = document.getElementById("query-btn");
-      var historyListEl = document.getElementById("history-list");
-      var clearHistoryBtn = document.getElementById("clear-history-btn");
       var statusEl = document.getElementById("status");
       var codeLabelEl = document.getElementById("fund-code-label");
       var nameEl = document.getElementById("fund-name");
@@ -497,100 +120,32 @@
       var jzrqEl = document.getElementById("fund-jzrq");
       var gztimeEl = document.getElementById("fund-gztime");
       var changePillEl = document.getElementById("change-pill");
-      var storageKey = "fund_recent_history_v1";
-      var historyLimit = 10;
+      var historyListEl = document.getElementById("history-list");
+      var clearHistoryBtn = document.getElementById("clear-history-btn");
+      var groupForm = document.getElementById("group-form");
+      var groupNameInput = document.getElementById("group-name");
+      var groupListEl = document.getElementById("group-list");
+      var groupStatusEl = document.getElementById("group-status");
 
-      function readHistory() {
-        try {
-          var raw = window.localStorage.getItem(storageKey);
-          var parsed = raw ? JSON.parse(raw) : [];
-          return Array.isArray(parsed) ? parsed : [];
-        } catch (error) {
-          return [];
-        }
-      }
-
-      function writeHistory(history) {
-        try {
-          window.localStorage.setItem(storageKey, JSON.stringify(history));
-        } catch (error) {
-          // 忽略本地存储异常，避免影响主流程
-        }
-      }
-
-      function renderHistory() {
-        var history = readHistory();
-
-        if (!history.length) {
-          historyListEl.innerHTML = '<div class="history-empty">暂无最近查看记录，查询基金后会自动展示最近 10 条。</div>';
-          return;
-        }
-
-        historyListEl.innerHTML = history.map(function (item) {
-          var rateText = formatRate(item.gszzl);
-          var viewedAt = item.viewedAt || "";
-          return ''
-            + '<button class="history-item" type="button" data-code="' + item.fundcode + '">'
-            + '<span class="history-item-code">基金代码 ' + item.fundcode + '</span>'
-            + '<span class="history-item-name">' + (item.name || "暂无基金名称") + '</span>'
-            + '<span class="history-item-meta">最新估值 ' + (item.gsz || "--") + ' / 涨跌幅 ' + rateText + '</span>'
-            + '<span class="history-item-meta">查看时间 ' + viewedAt + '</span>'
-            + '</button>';
-        }).join("");
-      }
-
-      function saveHistory(data) {
-        var history = readHistory().filter(function (item) {
-          return item.fundcode !== data.fundcode;
-        });
-
-        history.unshift({
-          fundcode: data.fundcode,
-          name: data.name || "",
-          gsz: data.gsz || "",
-          gszzl: data.gszzl || "",
-          viewedAt: data.gztime || new Date().toLocaleString()
-        });
-
-        writeHistory(history.slice(0, historyLimit));
-        renderHistory();
+      function setStatus(el, message, isError) {
+        el.className = isError ? "status error" : "status";
+        el.textContent = message || "";
       }
 
       function setLoading(isLoading, text) {
         queryBtn.disabled = isLoading;
         queryBtn.textContent = isLoading ? "查询中..." : "立即查询";
-        statusEl.className = "status";
-        statusEl.textContent = text || "";
-      }
-
-      function setError(message) {
-        statusEl.className = "status error";
-        statusEl.textContent = message;
-      }
-
-      function formatRate(value) {
-        var num = Number(value);
-        if (!isFinite(num)) {
-          return "--";
-        }
-        var sign = num > 0 ? "+" : "";
-        return sign + num.toFixed(2) + "%";
+        setStatus(statusEl, text || "", false);
       }
 
       function setTrend(rateValue) {
-        var num = Number(rateValue);
-        changePillEl.className = "change-pill neutral";
-        if (num > 0) {
-          changePillEl.className = "change-pill rise";
-        } else if (num < 0) {
-          changePillEl.className = "change-pill fall";
-        }
+        changePillEl.className = "change-pill " + api.getTrendClass(rateValue);
       }
 
       function renderFund(data) {
         codeLabelEl.textContent = "基金代码 " + (data.fundcode || "--");
         nameEl.textContent = data.name || "暂无基金名称";
-        rateEl.textContent = formatRate(data.gszzl);
+        rateEl.textContent = api.formatRate(data.gszzl);
         gszEl.textContent = data.gsz || "--";
         dwjzEl.textContent = data.dwjz || "--";
         jzrqEl.textContent = data.jzrq || "--";
@@ -598,85 +153,75 @@
         setTrend(data.gszzl);
       }
 
-      var activeScript = null;
-      var activeTimeoutId = null;
-      var pendingResolve = null;
-      var pendingReject = null;
+      function renderHistory() {
+        var history = api.readRecentHistory();
+        if (!history.length) {
+          historyListEl.innerHTML = '<div class="history-empty">暂无最近查看记录，查询基金后会自动展示最近 10 条。</div>';
+          return;
+        }
 
-      function cleanupPending() {
-        if (activeTimeoutId) {
-          clearTimeout(activeTimeoutId);
-          activeTimeoutId = null;
-        }
-        if (activeScript && activeScript.parentNode) {
-          activeScript.parentNode.removeChild(activeScript);
-        }
-        activeScript = null;
-        pendingResolve = null;
-        pendingReject = null;
+        historyListEl.innerHTML = history.map(function (item) {
+          return ''
+            + '<button class="history-item" type="button" data-code="' + item.fundcode + '">'
+            + '<span class="history-item-code">基金代码 ' + item.fundcode + '</span>'
+            + '<span class="history-item-name">' + (item.name || "暂无基金名称") + '</span>'
+            + '<span class="history-item-meta">最新估值 ' + (item.gsz || "--") + ' / 涨跌幅 ' + api.formatRate(item.gszzl) + '</span>'
+            + '<span class="history-item-meta">查看时间 ' + (item.viewedAt || "--") + '</span>'
+            + '</button>';
+        }).join("");
       }
 
-      window.jsonpgz = function (payload) {
-        if (typeof pendingResolve === "function") {
-          var resolve = pendingResolve;
-          cleanupPending();
-          resolve(payload || {});
+      function renderGroups() {
+        var groups = api.readGroups();
+        if (!groups.length) {
+          groupListEl.innerHTML = '<div class="history-empty">还没有分组，先创建一个分组作为你的基金看板入口。</div>';
+          return;
         }
-      };
 
-      function fetchFundInfo(code) {
-        return new Promise(function (resolve, reject) {
-          var script = document.createElement("script");
-
-          if (typeof pendingReject === "function") {
-            pendingReject(new Error("上一次请求已取消"));
-          }
-          cleanupPending();
-
-          pendingResolve = resolve;
-          pendingReject = reject;
-          activeScript = script;
-
-          activeTimeoutId = window.setTimeout(function () {
-            cleanupPending();
-            reject(new Error("请求超时，请稍后重试"));
-          }, 12000);
-
-          script.onerror = function () {
-            cleanupPending();
-            reject(new Error("接口加载失败，请检查网络或基金代码"));
-          };
-
-          script.src = apiBase + encodeURIComponent(code) + ".js?rt=" + Date.now();
-          document.body.appendChild(script);
-        });
+        groupListEl.innerHTML = groups.map(function (group) {
+          return ''
+            + '<article class="group-card">'
+            + '<div class="group-card-top">'
+            + '<div>'
+            + '<strong>' + group.name + '</strong>'
+            + '<span>' + group.funds.length + '/10 只基金</span>'
+            + '</div>'
+            + '<button class="ghost-btn small" type="button" data-delete-group="' + group.id + '">删除</button>'
+            + '</div>'
+            + '<p>' + (group.funds.length ? group.funds.join(" / ") : "该分组还没有基金代码") + '</p>'
+            + '<a class="primary-link" href="./group-detail.html?groupId=' + encodeURIComponent(group.id) + '">进入分组明细</a>'
+            + '</article>';
+        }).join("");
       }
 
-      async function handleQuery(code) {
-        if (!/^\d{6}$/.test(code)) {
-          setError("请输入 6 位基金代码");
+      async function handleQuery(rawCode) {
+        var code = api.normalizeFundCode(rawCode);
+        fundCodeInput.value = code;
+
+        if (!code) {
+          setStatus(statusEl, "请输入 6 位基金代码", true);
           return;
         }
 
         setLoading(true, "正在拉取基金实时估值...");
-
         try {
-          var data = await fetchFundInfo(code);
+          var data = await api.fetchFundInfo(code);
           if (!data || !data.fundcode) {
             throw new Error("未获取到有效基金数据");
           }
           renderFund(data);
-          saveHistory(data);
+          api.saveRecentFund(data);
+          renderHistory();
           setLoading(false, "查询成功，数据已更新。");
         } catch (error) {
           setLoading(false, "");
-          setError(error.message || "查询失败，请稍后再试");
+          setStatus(statusEl, error.message || "查询失败，请稍后再试", true);
         }
       }
 
       form.addEventListener("submit", function (event) {
         event.preventDefault();
-        handleQuery(fundCodeInput.value.trim());
+        handleQuery(fundCodeInput.value);
       });
 
       historyListEl.addEventListener("click", function (event) {
@@ -685,21 +230,42 @@
           return;
         }
         var code = target.getAttribute("data-code") || "";
-        fundCodeInput.value = code;
         handleQuery(code);
       });
 
       clearHistoryBtn.addEventListener("click", function () {
-        writeHistory([]);
+        api.clearRecentHistory();
         renderHistory();
-        statusEl.className = "status";
-        statusEl.textContent = "最近查看记录已清空。";
+        setStatus(statusEl, "最近查看记录已清空。", false);
+      });
+
+      groupForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var result = api.createGroup(groupNameInput.value);
+        if (!result.ok) {
+          setStatus(groupStatusEl, result.message, true);
+          return;
+        }
+        groupNameInput.value = "";
+        renderGroups();
+        setStatus(groupStatusEl, "分组已创建，点击卡片即可进入明细页。", false);
+      });
+
+      groupListEl.addEventListener("click", function (event) {
+        var deleteButton = event.target.closest("[data-delete-group]");
+        if (!deleteButton) {
+          return;
+        }
+        var groupId = deleteButton.getAttribute("data-delete-group");
+        api.deleteGroup(groupId);
+        renderGroups();
+        setStatus(groupStatusEl, "分组已删除。", false);
       });
 
       renderHistory();
-      handleQuery(fundCodeInput.value.trim());
+      renderGroups();
+      handleQuery(fundCodeInput.value);
     })();
   </script>
 </body>
-
 </html>
