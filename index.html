@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>基金实时估值</title>
+  <style>
+    :root {
+      --bg-start: #f5f7fb;
+      --bg-end: #eef3ff;
+      --card-bg: rgba(255, 255, 255, 0.94);
+      --text-main: #162033;
+      --text-sub: #667189;
+      --border: rgba(130, 150, 190, 0.18);
+      --shadow: 0 24px 64px rgba(42, 63, 102, 0.14);
+      --rise: #dc3e3e;
+      --fall: #0f9d7a;
+      --neutral: #40608f;
+      --accent: #2457f5;
+      --accent-soft: rgba(36, 87, 245, 0.1);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      color: var(--text-main);
+      background:
+        radial-gradient(circle at top left, rgba(36, 87, 245, 0.12), transparent 32%),
+        radial-gradient(circle at bottom right, rgba(15, 157, 122, 0.12), transparent 28%),
+        linear-gradient(160deg, var(--bg-start), var(--bg-end));
+    }
+
+    .page {
+      width: min(100%, 1120px);
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }
+
+    .hero {
+      display: grid;
+      gap: 24px;
+      align-items: center;
+      grid-template-columns: 1.05fr 0.95fr;
+    }
+
+    .hero-copy h1 {
+      margin: 0 0 14px;
+      font-size: clamp(30px, 5vw, 52px);
+      line-height: 1.08;
+      letter-spacing: -0.04em;
+    }
+
+    .hero-copy p {
+      margin: 0;
+      max-width: 560px;
+      font-size: 16px;
+      line-height: 1.8;
+      color: var(--text-sub);
+    }
+
+    .panel {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+
+    .search-panel {
+      padding: 24px;
+    }
+
+    .search-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 20px;
+      align-items: center;
+    }
+
+    .search-header strong {
+      display: block;
+      font-size: 19px;
+    }
+
+    .search-header span {
+      color: var(--text-sub);
+      font-size: 13px;
+    }
+
+    .badge {
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .search-box {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+    }
+
+    .search-box input {
+      width: 100%;
+      height: 52px;
+      padding: 0 16px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: #fff;
+      font-size: 16px;
+      color: var(--text-main);
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .search-box input:focus {
+      border-color: rgba(36, 87, 245, 0.5);
+      box-shadow: 0 0 0 4px rgba(36, 87, 245, 0.08);
+    }
+
+    .search-box button {
+      height: 52px;
+      padding: 0 22px;
+      border: 0;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #2457f5, #2c77ff);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+      box-shadow: 0 12px 24px rgba(36, 87, 245, 0.24);
+    }
+
+    .search-box button:hover {
+      transform: translateY(-1px);
+    }
+
+    .search-box button:disabled {
+      opacity: 0.7;
+      cursor: wait;
+      transform: none;
+    }
+
+    .hint-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 12px;
+      font-size: 13px;
+      color: var(--text-sub);
+      flex-wrap: wrap;
+    }
+
+    .quote-card {
+      margin-top: 28px;
+      padding: 28px;
+    }
+
+    .quote-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+      margin-bottom: 24px;
+    }
+
+    .fund-meta small {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #f2f6ff;
+      color: var(--accent);
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+
+    .fund-meta h2 {
+      margin: 14px 0 0;
+      font-size: clamp(22px, 4vw, 30px);
+      line-height: 1.35;
+    }
+
+    .change-pill {
+      min-width: 132px;
+      padding: 14px 16px;
+      border-radius: 22px;
+      text-align: right;
+      color: #fff;
+      background: var(--neutral);
+    }
+
+    .change-pill strong {
+      display: block;
+      font-size: 30px;
+      line-height: 1;
+    }
+
+    .change-pill span {
+      display: block;
+      margin-top: 8px;
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .metric {
+      padding: 18px;
+      border-radius: 20px;
+      background: linear-gradient(180deg, rgba(248, 250, 255, 0.96), rgba(242, 246, 255, 0.82));
+      border: 1px solid rgba(151, 170, 208, 0.15);
+    }
+
+    .metric span {
+      display: block;
+      margin-bottom: 10px;
+      font-size: 13px;
+      color: var(--text-sub);
+    }
+
+    .metric strong {
+      font-size: clamp(22px, 3vw, 28px);
+      line-height: 1.1;
+    }
+
+    .footer-note {
+      margin-top: 18px;
+      font-size: 13px;
+      color: var(--text-sub);
+      line-height: 1.7;
+    }
+
+    .status {
+      min-height: 22px;
+      margin-top: 14px;
+      font-size: 14px;
+      color: var(--text-sub);
+    }
+
+    .status.error {
+      color: #c0392b;
+    }
+
+    .rise {
+      background: linear-gradient(135deg, #ff6a4d, #dc3e3e);
+    }
+
+    .fall {
+      background: linear-gradient(135deg, #12b886, #0f9d7a);
+    }
+
+    .neutral {
+      background: linear-gradient(135deg, #4e6f9f, #40608f);
+    }
+
+    @media (max-width: 860px) {
+      .page {
+        padding: 22px 16px 36px;
+      }
+
+      .hero {
+        grid-template-columns: 1fr;
+      }
+
+      .search-panel,
+      .quote-card {
+        border-radius: 24px;
+      }
+    }
+
+    @media (max-width: 560px) {
+
+      .search-panel,
+      .quote-card {
+        padding: 18px;
+      }
+
+      .search-box {
+        grid-template-columns: 1fr;
+      }
+
+      .search-box button {
+        width: 100%;
+      }
+
+      .quote-top,
+      .metrics {
+        grid-template-columns: 1fr;
+        display: grid;
+      }
+
+      .change-pill {
+        min-width: auto;
+        text-align: left;
+      }
+
+      .hint-row {
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="hero-copy">
+        <h1>基金实时估值，一页直达</h1>
+        <p>输入基金代码，即可查看名称、前一日净值、实时估值和实时涨跌幅。</p>
+      </div>
+
+      <div class="panel search-panel">
+        <div class="search-header">
+          <div>
+            <strong>实时估值查询</strong>
+            <!-- <span>支持东方财富 JSONP 接口格式</span> -->
+          </div>
+          <div class="badge">原生响应式</div>
+        </div>
+
+        <form id="fund-form" class="search-box">
+          <input id="fund-code" name="fund-code" type="text" inputmode="numeric" maxlength="6" placeholder="请输入 6 位基金代码"
+            value="017470" autocomplete="off">
+          <button id="query-btn" type="submit">立即查询</button>
+        </form>
+
+        <div class="hint-row">
+          <span>示例代码：017470</span>
+          <!-- <span>移动端与桌面端自适应布局</span> -->
+        </div>
+
+        <div id="status" class="status">页面已就绪，点击“立即查询”获取估值。</div>
+      </div>
+    </section>
+
+    <section class="panel quote-card">
+      <div class="quote-top">
+        <div class="fund-meta">
+          <small id="fund-code-label">基金代码 --</small>
+          <h2 id="fund-name">等待查询基金信息</h2>
+        </div>
+        <div id="change-pill" class="change-pill neutral">
+          <strong id="fund-rate">--</strong>
+          <span>实时涨跌幅</span>
+        </div>
+      </div>
+
+      <div class="metrics">
+        <div class="metric">
+          <span>实时净值</span>
+          <strong id="fund-gsz">--</strong>
+        </div>
+        <div class="metric">
+          <span>上一交易日净值</span>
+          <strong id="fund-dwjz">--</strong>
+        </div>
+        <div class="metric">
+          <span>净值日期</span>
+          <strong id="fund-jzrq">--</strong>
+        </div>
+        <div class="metric">
+          <span>估值时间</span>
+          <strong id="fund-gztime">--</strong>
+        </div>
+      </div>
+
+      <div class="footer-note">
+        数据字段说明：`gsz` 为实时净值，`dwjz` 为前一日净值，`gszzl` 为实时涨跌百分比。
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      var apiBase = "https://fundgz.1234567.com.cn/js/";
+      var form = document.getElementById("fund-form");
+      var fundCodeInput = document.getElementById("fund-code");
+      var queryBtn = document.getElementById("query-btn");
+      var statusEl = document.getElementById("status");
+      var codeLabelEl = document.getElementById("fund-code-label");
+      var nameEl = document.getElementById("fund-name");
+      var rateEl = document.getElementById("fund-rate");
+      var gszEl = document.getElementById("fund-gsz");
+      var dwjzEl = document.getElementById("fund-dwjz");
+      var jzrqEl = document.getElementById("fund-jzrq");
+      var gztimeEl = document.getElementById("fund-gztime");
+      var changePillEl = document.getElementById("change-pill");
+
+      function setLoading(isLoading, text) {
+        queryBtn.disabled = isLoading;
+        queryBtn.textContent = isLoading ? "查询中..." : "立即查询";
+        statusEl.className = "status";
+        statusEl.textContent = text || "";
+      }
+
+      function setError(message) {
+        statusEl.className = "status error";
+        statusEl.textContent = message;
+      }
+
+      function formatRate(value) {
+        var num = Number(value);
+        if (!isFinite(num)) {
+          return "--";
+        }
+        var sign = num > 0 ? "+" : "";
+        return sign + num.toFixed(2) + "%";
+      }
+
+      function setTrend(rateValue) {
+        var num = Number(rateValue);
+        changePillEl.className = "change-pill neutral";
+        if (num > 0) {
+          changePillEl.className = "change-pill rise";
+        } else if (num < 0) {
+          changePillEl.className = "change-pill fall";
+        }
+      }
+
+      function renderFund(data) {
+        codeLabelEl.textContent = "基金代码 " + (data.fundcode || "--");
+        nameEl.textContent = data.name || "暂无基金名称";
+        rateEl.textContent = formatRate(data.gszzl);
+        gszEl.textContent = data.gsz || "--";
+        dwjzEl.textContent = data.dwjz || "--";
+        jzrqEl.textContent = data.jzrq || "--";
+        gztimeEl.textContent = data.gztime || "--";
+        setTrend(data.gszzl);
+      }
+
+      var activeScript = null;
+      var activeTimeoutId = null;
+      var pendingResolve = null;
+      var pendingReject = null;
+
+      function cleanupPending() {
+        if (activeTimeoutId) {
+          clearTimeout(activeTimeoutId);
+          activeTimeoutId = null;
+        }
+        if (activeScript && activeScript.parentNode) {
+          activeScript.parentNode.removeChild(activeScript);
+        }
+        activeScript = null;
+        pendingResolve = null;
+        pendingReject = null;
+      }
+
+      window.jsonpgz = function (payload) {
+        if (typeof pendingResolve === "function") {
+          var resolve = pendingResolve;
+          cleanupPending();
+          resolve(payload || {});
+        }
+      };
+
+      function fetchFundInfo(code) {
+        return new Promise(function (resolve, reject) {
+          var script = document.createElement("script");
+
+          if (typeof pendingReject === "function") {
+            pendingReject(new Error("上一次请求已取消"));
+          }
+          cleanupPending();
+
+          pendingResolve = resolve;
+          pendingReject = reject;
+          activeScript = script;
+
+          activeTimeoutId = window.setTimeout(function () {
+            cleanupPending();
+            reject(new Error("请求超时，请稍后重试"));
+          }, 12000);
+
+          script.onerror = function () {
+            cleanupPending();
+            reject(new Error("接口加载失败，请检查网络或基金代码"));
+          };
+
+          script.src = apiBase + encodeURIComponent(code) + ".js?rt=" + Date.now();
+          document.body.appendChild(script);
+        });
+      }
+
+      async function handleQuery(code) {
+        if (!/^\d{6}$/.test(code)) {
+          setError("请输入 6 位基金代码");
+          return;
+        }
+
+        setLoading(true, "正在拉取基金实时估值...");
+
+        try {
+          var data = await fetchFundInfo(code);
+          if (!data || !data.fundcode) {
+            throw new Error("未获取到有效基金数据");
+          }
+          renderFund(data);
+          setLoading(false, "查询成功，数据已更新。");
+        } catch (error) {
+          setLoading(false, "");
+          setError(error.message || "查询失败，请稍后再试");
+        }
+      }
+
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        handleQuery(fundCodeInput.value.trim());
+      });
+
+      handleQuery(fundCodeInput.value.trim());
+    })();
+  </script>
+</body>
+
+</html>
